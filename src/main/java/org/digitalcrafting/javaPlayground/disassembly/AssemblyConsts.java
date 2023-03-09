@@ -56,8 +56,12 @@ public class AssemblyConsts {
 
     public enum AssemblyOpCodes {
         MOV((byte) 0b100010_00, (byte) 0b11111100, "MOV"),
-        MOV_IMM_TO_REG((byte) 0b1011_0000, (byte) 0b1111_0000,  "MOV"),
+        MOV_IMM_TO_REG((byte) 0b1011_0000, (byte) 0b11110000,  "MOV"),
         MOV_IMM_TO_REG_MEM((byte) 0b11000110, (byte) 0b11111110,  "MOV"),
+        MOV_MEM_TO_ACC((byte) 0b10100000, (byte) 0b11111110,  "MOV"),
+        MOV_ACC_TO_MEM((byte) 0b10100010, (byte) 0b11111110,  "MOV"),
+        MOV_REG_MEM_TO_SEG((byte) 0b10001110, (byte) 0b11111111,  "MOV"),
+        MOV_SEG_TO_REG_MEM((byte) 0b10001100, (byte) 0b11111111,  "MOV"),
         ;
         public byte value;
         public byte mask;

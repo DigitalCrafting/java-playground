@@ -11,7 +11,8 @@ public class Disassembly {
         try {
 //            disassemble("org/digitalcrafting/javaPlayground/disassembly/mov_1");
 //            disassemble("org/digitalcrafting/javaPlayground/disassembly/mov_2");
-            disassemble("org/digitalcrafting/javaPlayground/disassembly/mov_3");
+//            disassemble("org/digitalcrafting/javaPlayground/disassembly/mov_3");
+            disassemble("org/digitalcrafting/javaPlayground/disassembly/mov_4_challenge");
         } catch (IOException e) {
             e.printStackTrace();
         }
