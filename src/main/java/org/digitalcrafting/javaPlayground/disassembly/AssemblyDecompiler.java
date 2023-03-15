@@ -15,26 +15,8 @@ public class AssemblyDecompiler {
             AssemblyInstruction current = new AssemblyInstruction();
 
             if (isOpcode(first, AssemblyOpCodes.MOV)) {
-                byte second = bytes[i + 1];
-                ModEncoding modEncoding = ModEncoding.get((byte) (second & MOV_RegMem_toFrom_Reg_Masks.MOD));
-                if (ModEncoding.REGISTER_MODE.equals(modEncoding)) {
-                    current = decompileMov(first, second);
-                    i += 2;
-                } else if (ModEncoding.MEMORY_MODE_NO_DISP.equals(modEncoding)) {
-                    if ((byte) (second & MOV_RegMem_toFrom_Reg_Masks.R_M) == 0b00000110) {
-                        current = decompileMov(first, second, bytes[i + 2], bytes[i + 3]);
-                        i += 4;
-                    } else {
-                        current = decompileMov(first, second);
-                        i += 2;
-                    }
-                } else if (ModEncoding.MEMORY_MODE_8_DISP.equals(modEncoding)) {
-                    current = decompileMov(first, second, bytes[i + 2]);
-                    i += 3;
-                } else if (ModEncoding.MEMORY_MODE_16_DISP.equals(modEncoding)) {
-                    current = decompileMov(first, second, bytes[i + 2], bytes[i + 3]);
-                    i += 4;
-                }
+                current.operation = AssemblyOpCodes.MOV.name;
+                i = decompileOperation(current, i, bytes);
             } else if (isOpcode(first, AssemblyOpCodes.MOV_IMM_TO_REG)) {
                 if (isMaskSet(first, (byte) 0b00001000)) {
                     current = decompileMovImmediateToRegister(first, bytes[i + 1], bytes[i + 2]);
@@ -44,54 +26,10 @@ public class AssemblyDecompiler {
                     i += 2;
                 }
             } else if (isOpcode(first, AssemblyOpCodes.MOV_IMM_TO_REG_MEM)) {
-                boolean w_val = ((first & MOV_RegMem_toFrom_Reg_Masks.W) == MOV_RegMem_toFrom_Reg_Masks.W);
-                byte second = bytes[i + 1];
-                ModEncoding modEncoding = ModEncoding.get((byte) (second & MOV_RegMem_toFrom_Reg_Masks.MOD));
-                if (ModEncoding.REGISTER_MODE.equals(modEncoding)) {
-                    if (w_val) {
-                        current = decompileMovImmediateToRegisterOrMemory(first, second, bytes[i + 2], bytes[i + 3], null, null);
-                        i += 4;
-                    } else {
-                        current = decompileMovImmediateToRegisterOrMemory(first, second, bytes[i + 2], null, null, null);
-                        i += 3;
-                    }
-                } else if (ModEncoding.MEMORY_MODE_NO_DISP.equals(modEncoding)) {
-                    if ((byte) (second & MOV_RegMem_toFrom_Reg_Masks.R_M) == 0b00000110) {
-                        if (w_val) {
-                            current = decompileMovImmediateToRegisterOrMemory(first, second, bytes[i + 2], bytes[i + 3], bytes[i + 4], bytes[i + 5]);
-                            i += 6;
-                        } else {
-                            current = decompileMovImmediateToRegisterOrMemory(first, second, bytes[i + 2], bytes[i + 3], bytes[i + 4], null);
-                            i += 5;
-                        }
-                    } else {
-                        if (w_val) {
-                            current = decompileMovImmediateToRegisterOrMemory(first, second, bytes[i + 2], bytes[i + 3], null, null);
-                            i += 4;
-                        } else {
-                            current = decompileMovImmediateToRegisterOrMemory(first, second, bytes[i + 2], null, null, null);
-                            i += 3;
-                        }
-                    }
-                } else if (ModEncoding.MEMORY_MODE_8_DISP.equals(modEncoding)) {
-                    if (w_val) {
-                        current = decompileMovImmediateToRegisterOrMemory(first, second, bytes[i + 2], bytes[i + 3], null, null);
-                        i += 4;
-                    } else {
-                        current = decompileMovImmediateToRegisterOrMemory(first, second, bytes[i + 2], null, null, null);
-                        i += 3;
-                    }
-                } else if (ModEncoding.MEMORY_MODE_16_DISP.equals(modEncoding)) {
-                    if (w_val) {
-                        current = decompileMovImmediateToRegisterOrMemory(first, second, bytes[i + 2], bytes[i + 3], bytes[i + 4], bytes[i + 5]);
-                        i += 6;
-                    } else {
-                        current = decompileMovImmediateToRegisterOrMemory(first, second, bytes[i + 2], bytes[i + 3], bytes[i + 4], null);
-                        i += 5;
-                    }
-                }
+                current.operation = AssemblyOpCodes.MOV_IMM_TO_REG_MEM.name;
+                i = decompileOperationImmediateToRegMem(current, i, bytes);
             } else if (isOpcode(first, AssemblyOpCodes.MOV_MEM_TO_ACC)) {
-                boolean w_val = ((first & MOV_RegMem_toFrom_Reg_Masks.W) == MOV_RegMem_toFrom_Reg_Masks.W);
+                boolean w_val = ((first & BaseOperands.W) == BaseOperands.W);
                 if (w_val) {
                     current = decompileMovMemoryToAccumulator(first, bytes[i + 1], bytes[i + 2]);
                     i += 3;
@@ -100,7 +38,7 @@ public class AssemblyDecompiler {
                     i += 2;
                 }
             } else if (isOpcode(first, AssemblyOpCodes.MOV_ACC_TO_MEM)) {
-                boolean w_val = ((first & MOV_RegMem_toFrom_Reg_Masks.W) == MOV_RegMem_toFrom_Reg_Masks.W);
+                boolean w_val = ((first & BaseOperands.W) == BaseOperands.W);
                 if (w_val) {
                     current = decompileMovAccumulatorToMemory(first, bytes[i + 1], bytes[i + 2]);
                     i += 3;
@@ -114,6 +52,15 @@ public class AssemblyDecompiler {
             } else if (isOpcode(first, AssemblyOpCodes.MOV_SEG_TO_REG_MEM)) {
                 current = decompileMovSegmentRegisterToRegMem(first, bytes[i + 1], bytes[i + 2], bytes[i + 3]);
                 i += 4;
+            } else if (isOpcode(first, AssemblyOpCodes.ADD)) {
+                current.operation = AssemblyOpCodes.ADD.name;
+                i = decompileOperation(current, i, bytes);
+            } else if (isOpcode(first, AssemblyOpCodes.ADD_IMM_TO_REG_MEM)) {
+                current.operation = AssemblyOpCodes.ADD_IMM_TO_REG_MEM.name;
+                i = decompileOperationImmediateToRegMem(current, i, bytes);
+            } else if (isOpcode(first, AssemblyOpCodes.ADD_IMM_TO_ACC)) {
+                current.operation = AssemblyOpCodes.ADD_IMM_TO_ACC.name;
+                i = decompileOperationImmediateToAccumulator(current, i, bytes);
             } else {
                 i += 2;
             }
@@ -132,49 +79,90 @@ public class AssemblyDecompiler {
         return (value & mask) == mask;
     }
 
-    private AssemblyInstruction decompileMov(byte first, byte second) {
-        return decompileMov(first, second, null);
-    }
-
-    private AssemblyInstruction decompileMov(byte first, byte second, Byte third) {
-        return decompileMov(first, second, third, null);
-    }
-
-    private AssemblyInstruction decompileMov(byte first, byte second, Byte third, Byte fourth) {
+    private AssemblyInstruction decompileMovImmediateToRegister(byte first, byte second, Byte third) {
         AssemblyInstruction instruction = new AssemblyInstruction();
-        instruction.operation = AssemblyOpCodes.MOV.name;
-        boolean d_val = (first & MOV_RegMem_toFrom_Reg_Masks.D) == MOV_RegMem_toFrom_Reg_Masks.D;
-        boolean w_val = (first & MOV_RegMem_toFrom_Reg_Masks.W) == MOV_RegMem_toFrom_Reg_Masks.W;
-        ModEncoding modEncoding = ModEncoding.get((byte) (second & MOV_RegMem_toFrom_Reg_Masks.MOD));
+        instruction.operation = AssemblyOpCodes.MOV_IMM_TO_REG.name;
+        instruction.destination = RegisterEncodings.getName((byte) (first & 0b00000_111), (first & 0b00001000) == 0b00001000);
+        instruction.source = String.valueOf(shortFromBytes(second, third));
+        return instruction;
+    }
 
-        String register = RegisterEncodings.getName((byte) (second & MOV_RegMem_toFrom_Reg_Masks.REG), w_val);
+    private AssemblyInstruction decompileMovMemoryToAccumulator(byte first, byte second, Byte third) {
+        AssemblyInstruction instruction = new AssemblyInstruction();
+        instruction.operation = AssemblyOpCodes.MOV_MEM_TO_ACC.name;
+        instruction.destination = "ax";
+        instruction.source = "[" + shortFromBytes(second, third) + "]";
+        return instruction;
+    }
+
+    private AssemblyInstruction decompileMovAccumulatorToMemory(byte first, byte second, Byte third) {
+        AssemblyInstruction instruction = new AssemblyInstruction();
+        instruction.operation = AssemblyOpCodes.MOV_ACC_TO_MEM.name;
+        instruction.source = "ax";
+        instruction.destination = "[" + shortFromBytes(second, third) + "]";
+        return instruction;
+    }
+
+    private AssemblyInstruction decompileMovRegMemToSegmentRegister(byte first, byte second, Byte third, Byte fourth) {
+        AssemblyInstruction instruction = new AssemblyInstruction();
+        instruction.operation = AssemblyOpCodes.MOV_REG_MEM_TO_SEG.name;
+        System.out.println("Called decompileMovRegMemToSegmentRegister");
+        return instruction;
+    }
+
+    private AssemblyInstruction decompileMovSegmentRegisterToRegMem(byte first, byte second, Byte third, Byte fourth) {
+        AssemblyInstruction instruction = new AssemblyInstruction();
+        instruction.operation = AssemblyOpCodes.MOV_SEG_TO_REG_MEM.name;
+        System.out.println("Called decompileMovSegmentRegisterToRegMem");
+        return instruction;
+    }
+
+    private int decompileOperation(AssemblyInstruction instruction, int index, byte[] bytes) {
+        byte first = bytes[index];
+        byte second = bytes[index + 1];
+        Byte third = null;
+        Byte fourth = null;
+
+        boolean d_val = (first & BaseOperands.D) == BaseOperands.D;
+        boolean w_val = (first & BaseOperands.W) == BaseOperands.W;
+        ModEncoding modEncoding = ModEncoding.get((byte) (second & BaseOperands.MOD));
+        String register = RegisterEncodings.getName((byte) (second & BaseOperands.REG), w_val);
         String address_or_register;
 
         if (ModEncoding.REGISTER_MODE.equals(modEncoding)) {
-            address_or_register = RegisterEncodings.getName((byte) (second & MOV_RegMem_toFrom_Reg_Masks.R_M), w_val);
+            address_or_register = RegisterEncodings.getName((byte) (second & BaseOperands.R_M), w_val);
+            index += 2;
         } else {
-            String effectiveAddressCalculation = EFFECTIVE_ADDRESS_CALCULATIONS.get((byte) (second & MOV_RegMem_toFrom_Reg_Masks.R_M));
+            String effectiveAddressCalculation = EFFECTIVE_ADDRESS_CALCULATIONS.get((byte) (second & BaseOperands.R_M));
+
             if (ModEncoding.MEMORY_MODE_NO_DISP.equals(modEncoding)) {
-                if ((byte) (second & MOV_RegMem_toFrom_Reg_Masks.R_M) == 0b00000110) {
-                    ByteBuffer bb = ByteBuffer.allocate(2);
-                    bb.order(ByteOrder.LITTLE_ENDIAN);
-                    bb.put(third);
-                    bb.put(fourth);
-                    short shortVal = bb.getShort(0);
-                    effectiveAddressCalculation = String.valueOf(shortVal);
+                if ((byte) (second & BaseOperands.R_M) == 0b00000110) {
+                    third = bytes[index + 2];
+                    fourth = bytes[index + 3];
+                    index += 4;
+
+                    if ((byte) (second & BaseOperands.R_M) == 0b00000110) {
+                        short shortVal = shortFromBytes(third, fourth);
+                        effectiveAddressCalculation = String.valueOf(shortVal);
+                    }
+                } else {
+                    index += 2;
                 }
             } else if (ModEncoding.MEMORY_MODE_8_DISP.equals(modEncoding)) {
+                third = bytes[index + 2];
+                index += 3;
+
                 if (third > 0) {
                     effectiveAddressCalculation += " + " + third;
                 } else if (third < 0) {
                     effectiveAddressCalculation += String.valueOf(third);
                 }
             } else if (ModEncoding.MEMORY_MODE_16_DISP.equals(modEncoding)) {
-                ByteBuffer bb = ByteBuffer.allocate(2);
-                bb.order(ByteOrder.LITTLE_ENDIAN);
-                bb.put(third);
-                bb.put(fourth);
-                short shortVal = bb.getShort(0);
+                third = bytes[index + 2];
+                fourth = bytes[index + 3];
+                index += 4;
+
+                short shortVal = shortFromBytes(third, fourth);
                 if (shortVal > 0) {
                     effectiveAddressCalculation += " + " + String.valueOf(shortVal);
                 } else if (shortVal < 0) {
@@ -192,66 +180,79 @@ public class AssemblyDecompiler {
             instruction.destination = address_or_register;
         }
 
-        return instruction;
+        return index;
     }
 
-    private AssemblyInstruction decompileMovImmediateToRegister(byte first, byte second, Byte third) {
-        AssemblyInstruction instruction = new AssemblyInstruction();
-        instruction.operation = AssemblyOpCodes.MOV.name;
-        instruction.destination = RegisterEncodings.getName((byte) (first & 0b00000_111), (first & 0b00001000) == 0b00001000);
-
-        if (third == null) {
-            instruction.source = String.valueOf(second);
-        } else {
-            ByteBuffer bb = ByteBuffer.allocate(2);
-            bb.order(ByteOrder.LITTLE_ENDIAN);
-            bb.put(second);
-            bb.put(third);
-            short shortVal = bb.getShort(0);
-            instruction.source = String.valueOf(shortVal);
-        }
-
-        return instruction;
-    }
-
-    private AssemblyInstruction decompileMovImmediateToRegisterOrMemory(byte first, byte second, Byte third, Byte fourth, Byte fifth, Byte sixth) {
-        AssemblyInstruction instruction = new AssemblyInstruction();
-        instruction.operation = AssemblyOpCodes.MOV_IMM_TO_REG_MEM.name;
-        ModEncoding modEncoding = ModEncoding.get((byte) (second & MOV_RegMem_toFrom_Reg_Masks.MOD));
+    /*
+    * |------------------------------------------------------------------------|
+    * | OPCODE S W | MOD 0 0 0 R/M | DISP (low) | DISP (high) | data8 | data16 |
+    * |------------------------------------------------------------------------|
+    * */
+    private int decompileOperationImmediateToRegMem(AssemblyInstruction instruction, int index, byte[] bytes) {
+        byte first = bytes[index];
+        byte second = bytes[index + 1];
 
         Byte dispLow = null;
         Byte dispHigh = null;
         Byte data8 = null;
         Byte data16 = null;
 
-        String address_or_register;
-        if (ModEncoding.REGISTER_MODE.equals(modEncoding)) {
-            address_or_register = RegisterEncodings.getName((byte) (second & MOV_RegMem_toFrom_Reg_Masks.R_M), sixth != null);
-            data8 = third;
-            data16 = fourth;
-        } else {
-            String effectiveAddressCalculation = EFFECTIVE_ADDRESS_CALCULATIONS.get((byte) (second & MOV_RegMem_toFrom_Reg_Masks.R_M));
-            if (ModEncoding.MEMORY_MODE_NO_DISP.equals(modEncoding)) {
-                if ((byte) (second & MOV_RegMem_toFrom_Reg_Masks.R_M) == 0b00000110) {
-                    dispLow = third;
-                    dispHigh = fourth;
-                    data8 = fifth;
-                    data16 = sixth;
+        boolean s_val = (first & BaseOperands.S) == BaseOperands.S;
+        boolean w_val = (first & BaseOperands.W) == BaseOperands.W;
 
-                    ByteBuffer bb = ByteBuffer.allocate(2);
-                    bb.order(ByteOrder.LITTLE_ENDIAN);
-                    bb.put(dispLow);
-                    bb.put(dispHigh);
-                    short shortVal = bb.getShort(0);
+        boolean extended_data;
+        if ("mov".equals(instruction.operation)) {
+            extended_data = w_val;
+        } else {
+            extended_data = !s_val && w_val;
+        }
+
+        ModEncoding modEncoding = ModEncoding.get((byte) (second & BaseOperands.MOD));
+        String address_or_register;
+
+        /* Register Mode == No displacement */
+        if (ModEncoding.REGISTER_MODE.equals(modEncoding)) {
+            address_or_register = RegisterEncodings.getName((byte) (second & BaseOperands.R_M), w_val);
+            data8 = bytes[index + 2];
+            if (extended_data) {
+                data16 = bytes[index + 3];
+                index += 4;
+            } else {
+                index += 3;
+            }
+        } else {
+            String effectiveAddressCalculation = EFFECTIVE_ADDRESS_CALCULATIONS.get((byte) (second & BaseOperands.R_M));
+            if (ModEncoding.MEMORY_MODE_NO_DISP.equals(modEncoding)) {
+                if ((byte) (second & BaseOperands.R_M) == 0b00000110) {
+                    dispLow = bytes[index + 2];
+                    dispHigh = bytes[index + 3];
+                    data8 = bytes[index + 4];
+                    if (extended_data) {
+                        data16 = bytes[index + 5];
+                        index += 6;
+                    } else {
+                        index += 5;
+                    }
+                    short shortVal = shortFromBytes(dispLow, dispHigh);
                     effectiveAddressCalculation = String.valueOf(shortVal);
                 } else {
-                    data8 = third;
-                    data16 = fourth;
+                    data8 = bytes[index + 2];
+                    if (extended_data) {
+                        data16 = bytes[index + 3];
+                        index += 4;
+                    } else {
+                        index += 3;
+                    }
                 }
             } else if (ModEncoding.MEMORY_MODE_8_DISP.equals(modEncoding)) {
-                dispLow = third;
-                data8 = fourth;
-                data16 = fifth;
+                dispLow = bytes[index + 2];
+                data8 = bytes[index + 3];
+                if (extended_data) {
+                    data16 = bytes[index + 4];
+                    index += 5;
+                } else {
+                    index += 4;
+                }
 
                 if (dispLow > 0) {
                     effectiveAddressCalculation += " + " + dispLow;
@@ -259,16 +260,17 @@ public class AssemblyDecompiler {
                     effectiveAddressCalculation += dispLow;
                 }
             } else if (ModEncoding.MEMORY_MODE_16_DISP.equals(modEncoding)) {
-                dispLow = third;
-                dispHigh = fourth;
-                data8 = fifth;
-                data16 = sixth;
+                dispLow = bytes[index + 2];
+                dispHigh = bytes[index + 3];
+                data8 = bytes[index + 4];
+                if (extended_data) {
+                    data16 = bytes[index + 5];
+                    index += 6;
+                } else {
+                    index += 5;
+                }
 
-                ByteBuffer bb = ByteBuffer.allocate(2);
-                bb.order(ByteOrder.LITTLE_ENDIAN);
-                bb.put(dispLow);
-                bb.put(dispHigh);
-                short shortVal = bb.getShort(0);
+                short shortVal = shortFromBytes(dispLow, dispHigh);
                 if (shortVal > 0) {
                     effectiveAddressCalculation += " + " + String.valueOf(shortVal);
                 } else if (shortVal < 0) {
@@ -280,12 +282,7 @@ public class AssemblyDecompiler {
 
         String data;
         if (data16 != null) {
-            ByteBuffer bb = ByteBuffer.allocate(2);
-            bb.order(ByteOrder.LITTLE_ENDIAN);
-            bb.put(data8);
-            bb.put(data16);
-            short shortVal = bb.getShort(0);
-            data = " word " + shortVal;
+            data = " word " + shortFromBytes(data8, data16);
         } else {
             data = " byte " + data8;
         }
@@ -293,63 +290,23 @@ public class AssemblyDecompiler {
         instruction.destination = address_or_register;
         instruction.source = data;
 
-        return instruction;
+        return index;
     }
 
-    private AssemblyInstruction decompileMovMemoryToAccumulator(byte first, byte second, Byte third) {
-        AssemblyInstruction instruction = new AssemblyInstruction();
-        instruction.operation = "MOV";
-        instruction.destination = "AX";
+    private int decompileOperationImmediateToAccumulator(AssemblyInstruction instruction, int index, byte[] bytes) {
 
-        String memory;
-        if (third == null) {
-            memory = "[" + (int) second + "]";
+        return index + 2;
+    }
+
+    private short shortFromBytes(byte low, Byte high) {
+        if (high == null) {
+            return low;
         } else {
             ByteBuffer bb = ByteBuffer.allocate(2);
             bb.order(ByteOrder.LITTLE_ENDIAN);
-            bb.put(second);
-            bb.put(third);
-            short shortVal = bb.getShort(0);
-            memory = "[" + shortVal + "]";
+            bb.put(low);
+            bb.put(high);
+            return bb.getShort(0);
         }
-
-        instruction.source = memory;
-        return instruction;
-    }
-
-    private AssemblyInstruction decompileMovAccumulatorToMemory(byte first, byte second, Byte third) {
-        AssemblyInstruction instruction = new AssemblyInstruction();
-        instruction.operation = "MOV";
-        instruction.source = "AX";
-
-        String memory;
-        if (third == null) {
-            memory = "[" + (int) second + "]";
-        } else {
-            ByteBuffer bb = ByteBuffer.allocate(2);
-            bb.order(ByteOrder.LITTLE_ENDIAN);
-            bb.put(second);
-            bb.put(third);
-            short shortVal = bb.getShort(0);
-            memory = "[" + shortVal + "]";
-        }
-
-        instruction.destination = memory;
-
-        return instruction;
-    }
-
-    private AssemblyInstruction decompileMovRegMemToSegmentRegister(byte first, byte second, Byte third, Byte fourth) {
-        AssemblyInstruction instruction = new AssemblyInstruction();
-        instruction.operation = "MOV";
-        System.out.println("Called decompileMovRegMemToSegmentRegister");
-        return instruction;
-    }
-
-    private AssemblyInstruction decompileMovSegmentRegisterToRegMem(byte first, byte second, Byte third, Byte fourth) {
-        AssemblyInstruction instruction = new AssemblyInstruction();
-        instruction.operation = "MOV";
-        System.out.println("Called decompileMovSegmentRegisterToRegMem");
-        return instruction;
     }
 }
