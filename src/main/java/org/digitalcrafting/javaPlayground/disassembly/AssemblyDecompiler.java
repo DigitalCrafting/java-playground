@@ -2,12 +2,14 @@ package org.digitalcrafting.javaPlayground.disassembly;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.digitalcrafting.javaPlayground.disassembly.AssemblyConsts.*;
 
 public class AssemblyDecompiler {
     public String decode(byte[] bytes) {
-        StringBuilder decodedAssembly = new StringBuilder();
+        List<AssemblyInstruction> assemblyInstructionList = new ArrayList<>();
 
         int i = 0;
         while (i < bytes.length - 1) {
@@ -52,23 +54,48 @@ public class AssemblyDecompiler {
             } else if (isOpcode(first, AssemblyOpCodes.MOV_SEG_TO_REG_MEM)) {
                 current = decompileMovSegmentRegisterToRegMem(first, bytes[i + 1], bytes[i + 2], bytes[i + 3]);
                 i += 4;
+            } else if (isOpcode(first, AssemblyOpCodes.IMM_TO_REG_MEM)) {
+                byte second = bytes[i + 1];
+                if ((second & 0b00_111_000) == 0b00_101_000) {
+                    current.operation = AssemblyOpCodes.SUB.name;
+                } else if ((second & 0b00_111_000) == 0b00_000_000) {
+                    current.operation = AssemblyOpCodes.ADD.name;
+                } else if ((second & 0b00_111_000) == 0b00_111_000) {
+                    current.operation = AssemblyOpCodes.CMP.name;
+                }
+                i = decompileOperationImmediateToRegMem(current, i, bytes);
             } else if (isOpcode(first, AssemblyOpCodes.ADD)) {
                 current.operation = AssemblyOpCodes.ADD.name;
                 i = decompileOperation(current, i, bytes);
-            } else if (isOpcode(first, AssemblyOpCodes.ADD_IMM_TO_REG_MEM)) {
-                current.operation = AssemblyOpCodes.ADD_IMM_TO_REG_MEM.name;
-                i = decompileOperationImmediateToRegMem(current, i, bytes);
             } else if (isOpcode(first, AssemblyOpCodes.ADD_IMM_TO_ACC)) {
                 current.operation = AssemblyOpCodes.ADD_IMM_TO_ACC.name;
                 i = decompileOperationImmediateToAccumulator(current, i, bytes);
+            } else if (isOpcode(first, AssemblyOpCodes.SUB)) {
+                current.operation = AssemblyOpCodes.SUB.name;
+                i = decompileOperation(current, i, bytes);
+            } else if (isOpcode(first, AssemblyOpCodes.SUB_IMM_TO_ACC)) {
+                current.operation = AssemblyOpCodes.SUB_IMM_TO_ACC.name;
+                i = decompileOperationImmediateToAccumulator(current, i, bytes);
+            } else if (isOpcode(first, AssemblyOpCodes.CMP)) {
+                current.operation = AssemblyOpCodes.CMP.name;
+                i = decompileOperation(current, i, bytes);
+            } else if (isOpcode(first, AssemblyOpCodes.CMP_IMM_TO_ACC)) {
+                current.operation = AssemblyOpCodes.CMP_IMM_TO_ACC.name;
+                i = decompileOperationImmediateToAccumulator(current, i, bytes);
+            } else if (isOpcode(first, AssemblyOpCodes.JMP_VARIANTS)) {
+                i = decompileJumpVariants(current, i, bytes);
+            } else if (isOpcode(first, AssemblyOpCodes.LOOP_VARIANTS)) {
+                i = decompileLoopVariants(current, i, bytes);
             } else {
                 i += 2;
             }
 
-            decodedAssembly.append(current).append("\n");
+            assemblyInstructionList.add(current);
         }
 
-        return decodedAssembly.toString();
+        StringBuilder builder = new StringBuilder();
+        assemblyInstructionList.forEach(builder::append);
+        return builder.toString();
     }
 
     private boolean isOpcode(byte first, AssemblyOpCodes opcode) {
@@ -117,6 +144,11 @@ public class AssemblyDecompiler {
         return instruction;
     }
 
+    /*
+     * |-----------------------------------------------------|
+     * | OPCODE D W | MOD REG R/M | DISP (low) | DISP (high) |
+     * |-----------------------------------------------------|
+     * */
     private int decompileOperation(AssemblyInstruction instruction, int index, byte[] bytes) {
         byte first = bytes[index];
         byte second = bytes[index + 1];
@@ -152,7 +184,7 @@ public class AssemblyDecompiler {
                 third = bytes[index + 2];
                 index += 3;
 
-                if (third > 0) {
+                if (third >= 0) {
                     effectiveAddressCalculation += " + " + third;
                 } else if (third < 0) {
                     effectiveAddressCalculation += String.valueOf(third);
@@ -163,9 +195,9 @@ public class AssemblyDecompiler {
                 index += 4;
 
                 short shortVal = shortFromBytes(third, fourth);
-                if (shortVal > 0) {
+                if (shortVal >= 0) {
                     effectiveAddressCalculation += " + " + String.valueOf(shortVal);
-                } else if (shortVal < 0) {
+                } else {
                     effectiveAddressCalculation += " " + shortVal;
                 }
             }
@@ -184,10 +216,10 @@ public class AssemblyDecompiler {
     }
 
     /*
-    * |------------------------------------------------------------------------|
-    * | OPCODE S W | MOD 0 0 0 R/M | DISP (low) | DISP (high) | data8 | data16 |
-    * |------------------------------------------------------------------------|
-    * */
+     * |------------------------------------------------------------------------|
+     * | OPCODE S W | MOD 0 0 0 R/M | DISP (low) | DISP (high) | data8 | data16 |
+     * |------------------------------------------------------------------------|
+     * */
     private int decompileOperationImmediateToRegMem(AssemblyInstruction instruction, int index, byte[] bytes) {
         byte first = bytes[index];
         byte second = bytes[index + 1];
@@ -209,6 +241,7 @@ public class AssemblyDecompiler {
 
         ModEncoding modEncoding = ModEncoding.get((byte) (second & BaseOperands.MOD));
         String address_or_register;
+        String explicitSizeDirective = "";
 
         /* Register Mode == No displacement */
         if (ModEncoding.REGISTER_MODE.equals(modEncoding)) {
@@ -271,20 +304,31 @@ public class AssemblyDecompiler {
                 }
 
                 short shortVal = shortFromBytes(dispLow, dispHigh);
-                if (shortVal > 0) {
+                if (shortVal >= 0) {
                     effectiveAddressCalculation += " + " + String.valueOf(shortVal);
-                } else if (shortVal < 0) {
+                } else {
                     effectiveAddressCalculation += " " + shortVal;
                 }
             }
             address_or_register = "[" + effectiveAddressCalculation + "]";
         }
 
-        String data;
-        if (data16 != null) {
-            data = " word " + shortFromBytes(data8, data16);
-        } else {
-            data = " byte " + data8;
+        if (!ModEncoding.REGISTER_MODE.equals(modEncoding) && !AssemblyOpCodes.MOV.name.equals(instruction.operation)) {
+            if (w_val) {
+                address_or_register = "word " + address_or_register;
+            } else {
+                address_or_register = "byte " + address_or_register;
+            }
+        }
+
+        short dataAsShort = shortFromBytes(data8, data16);
+        String data = String.valueOf(dataAsShort);
+        if (AssemblyOpCodes.MOV.name.equals(instruction.operation)) {
+            if (data16 != null) {
+                data = " word " + data;
+            } else {
+                data = " byte " + data;
+            }
         }
 
         instruction.destination = address_or_register;
@@ -293,7 +337,49 @@ public class AssemblyDecompiler {
         return index;
     }
 
+    /*
+     * |------------------------------|
+     * | OPCODE 0 W |  data8 | data16 |
+     * |------------------------------|
+     * */
     private int decompileOperationImmediateToAccumulator(AssemblyInstruction instruction, int index, byte[] bytes) {
+        byte first = bytes[index];
+        byte data8 = bytes[index + 1];
+        Byte data16 = null;
+        boolean w_val = (first & BaseOperands.W) == BaseOperands.W;
+        String accumulator;
+
+        if (w_val) {
+            data16 = bytes[index + 2];
+            index += 3;
+            accumulator = "ax";
+        } else {
+            index += 2;
+            accumulator = "al";
+        }
+
+        instruction.destination = accumulator;
+        instruction.source = String.valueOf(shortFromBytes(data8, data16));
+
+        return index;
+    }
+
+    private int decompileJumpVariants(AssemblyInstruction instruction, int index, byte[] bytes) {
+        instruction.operation = JumpVariants.getByBits(bytes[index]).name;
+        /* For some reason when decompiling the assembly, you have to add this offset.
+        *  Unless you provide the nasm with actual labels, instead of the offsets, which I didn't yet.
+        * */
+        instruction.destination = "($+2)+" + String.valueOf(bytes[index + 1]);
+
+        return index + 2;
+    }
+
+    private int decompileLoopVariants(AssemblyInstruction instruction, int index, byte[] bytes) {
+        instruction.operation = LoopVariants.getByBits(bytes[index]).name;
+        /* For some reason when decompiling the assembly, you have to add this offset.
+         *  Unless you provide the nasm with actual labels, instead of the offsets, which I didn't yet.
+         * */
+        instruction.destination = "($+2)+" + String.valueOf(bytes[index + 1]);
 
         return index + 2;
     }

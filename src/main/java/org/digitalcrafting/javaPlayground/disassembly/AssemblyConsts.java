@@ -54,17 +54,82 @@ public class AssemblyConsts {
         }
     }
 
+    public enum JumpVariants {
+//        JNZ((byte) 0b00000101, "jnz"),
+        JE((byte) 0b00000100, "je"),
+        JL((byte) 0b00001100, "jl"),
+        JLE((byte) 0b00001110, "jle"),
+        JB((byte) 0b00000010, "jb"),
+        JBE((byte) 0b00000110, "jbe"),
+        JP((byte) 0b00001010, "jp"),
+        JO((byte) 0b00000000, "jo"),
+        JS((byte) 0b00001000, "js"),
+        JNE((byte) 0b00000101, "jne"),
+        JNL((byte) 0b00001101, "jnl"),
+        JG((byte) 0b00001111, "jg"),
+        JNB((byte) 0b00000011, "jnb"),
+        JA((byte) 0b00000111, "ja"),
+        JNP((byte) 0b00001011, "jnp"),
+        JNO((byte) 0b00000001, "jno"),
+        JNS((byte) 0b00001001, "jns");
+        public byte value;
+        public String name;
+
+        JumpVariants(byte value, String name) {
+            this.value = value;
+            this.name = name;
+        }
+
+        public static JumpVariants getByBits(byte check) {
+            for (JumpVariants variant : JumpVariants.values()) {
+                if ((check & 0b00001111) == variant.value) {
+                    return variant;
+                }
+            }
+            return null;
+        }
+    }
+
+    public enum LoopVariants {
+        LOOP((byte) 0b00000010, "loop"),
+        LOOPZ((byte) 0b00000001, "loopz"),
+        LOOPNZ((byte) 0b00000000, "loopnz"),
+        JCXZ((byte) 0b00000011, "jcxz");
+        public byte value;
+        public String name;
+
+        LoopVariants(byte value, String name) {
+            this.value = value;
+            this.name = name;
+        }
+
+        public static LoopVariants getByBits(byte check) {
+            for (LoopVariants variant : LoopVariants.values()) {
+                if ((check & 0b00001111) == variant.value) {
+                    return variant;
+                }
+            }
+            return null;
+        }
+    }
+
     public enum AssemblyOpCodes {
         MOV((byte) 0b100010_00, (byte) 0b11111100, "mov"),
-        MOV_IMM_TO_REG((byte) 0b1011_0000, (byte) 0b11110000,  "mov"),
-        MOV_IMM_TO_REG_MEM((byte) 0b11000110, (byte) 0b11111110,  "mov"),
-        MOV_MEM_TO_ACC((byte) 0b10100000, (byte) 0b11111110,  "mov"),
-        MOV_ACC_TO_MEM((byte) 0b10100010, (byte) 0b11111110,  "mov"),
-        MOV_REG_MEM_TO_SEG((byte) 0b10001110, (byte) 0b11111111,  "mov"),
-        MOV_SEG_TO_REG_MEM((byte) 0b10001100, (byte) 0b11111111,  "mov"),
-        ADD((byte) 0b00000000, (byte) 0b11111100,  "add"),
-        ADD_IMM_TO_REG_MEM((byte) 0b10000000, (byte) 0b11111100,  "add"),
-        ADD_IMM_TO_ACC((byte) 0b00000100, (byte) 0b11111110,  "add"),
+        MOV_IMM_TO_REG((byte) 0b1011_0000, (byte) 0b11110000, "mov"),
+        MOV_IMM_TO_REG_MEM((byte) 0b11000110, (byte) 0b11111110, "mov"),
+        MOV_MEM_TO_ACC((byte) 0b10100000, (byte) 0b11111110, "mov"),
+        MOV_ACC_TO_MEM((byte) 0b10100010, (byte) 0b11111110, "mov"),
+        MOV_REG_MEM_TO_SEG((byte) 0b10001110, (byte) 0b11111111, "mov"),
+        MOV_SEG_TO_REG_MEM((byte) 0b10001100, (byte) 0b11111111, "mov"),
+        ADD((byte) 0b00000000, (byte) 0b11111100, "add"),
+        ADD_IMM_TO_ACC((byte) 0b00000100, (byte) 0b11111110, "add"),
+        SUB((byte) 0b00101000, (byte) 0b11111100, "sub"),
+        SUB_IMM_TO_ACC((byte) 0b00101100, (byte) 0b11111110, "sub"),
+        CMP((byte) 0b00111000, (byte) 0b11111100, "cmp"),
+        CMP_IMM_TO_ACC((byte) 0b00111100, (byte) 0b11111110, "cmp"),
+        IMM_TO_REG_MEM((byte) 0b10000000, (byte) 0b11111100, "DETERMINE BY REG"),
+        JMP_VARIANTS((byte) 0b01110000, (byte) 0b11110000, "DETERMINE BY LOWER BITS"),
+        LOOP_VARIANTS((byte) 0b11100000, (byte) 0b11110000, "DETERMINE BY LOWER BITS")
         ;
         public byte value;
         public byte mask;
