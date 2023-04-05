@@ -19,9 +19,9 @@ public class Disassembly {
 //            disassemble("org/digitalcrafting/javaPlayground/disassembly/mov_2", true);
 //            disassemble("org/digitalcrafting/javaPlayground/disassembly/mov_3", true);
 //            disassemble("org/digitalcrafting/javaPlayground/disassembly/mov_4_challenge", true);
-            disassemble("org/digitalcrafting/javaPlayground/disassembly/add_sub_cmp_jnz", true);
+//            disassemble("org/digitalcrafting/javaPlayground/disassembly/add_sub_cmp_jnz", true);
 //            disassemble("org/digitalcrafting/javaPlayground/disassembly/add_sub_cmp_jnz_disassembled", false);
-//            disassemble("org/digitalcrafting/javaPlayground/disassembly/completionist");
+            disassemble("org/digitalcrafting/javaPlayground/disassembly/completionist", false);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -33,6 +33,10 @@ public class Disassembly {
         String fileName = pathParts[pathParts.length - 1];
         System.out.println("Disassembling file " + fileName);
         String decoded = DECODER.decode(bytes);
+        if (decoded == null) {
+            return;
+        }
+
         System.out.println(decoded);
 
         String[] pathToResource = Arrays.copyOfRange(pathParts, 0, pathParts.length - 1);

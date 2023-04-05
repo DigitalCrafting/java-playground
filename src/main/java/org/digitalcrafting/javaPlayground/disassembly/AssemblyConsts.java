@@ -54,6 +54,21 @@ public class AssemblyConsts {
         }
     }
 
+    public enum SegmentEncodings {
+        ES((byte) 0b00000000, "es"),
+        CS((byte) 0b00000001, "cs"),
+        SS((byte) 0b00000010, "ss"),
+        DS((byte) 0b00000011, "ds"),
+        ;
+        public byte value;
+        public String name;
+
+        SegmentEncodings(byte value, String name) {
+            this.value = value;
+            this.name = name;
+        }
+    }
+
     public enum JumpVariants {
 //        JNZ((byte) 0b00000101, "jnz"),
         JE((byte) 0b00000100, "je"),
@@ -128,8 +143,10 @@ public class AssemblyConsts {
         CMP((byte) 0b00111000, (byte) 0b11111100, "cmp"),
         CMP_IMM_TO_ACC((byte) 0b00111100, (byte) 0b11111110, "cmp"),
         IMM_TO_REG_MEM((byte) 0b10000000, (byte) 0b11111100, "DETERMINE BY REG"),
-        JMP_VARIANTS((byte) 0b01110000, (byte) 0b11110000, "DETERMINE BY LOWER BITS"),
-        LOOP_VARIANTS((byte) 0b11100000, (byte) 0b11110000, "DETERMINE BY LOWER BITS")
+        JMP_VARIANTS((byte) 0b01110000, (byte) 0b11110000, "DETERMINED BY LOWER BITS"),
+        LOOP_VARIANTS((byte) 0b11100000, (byte) 0b11110000, "DETERMINED BY LOWER BITS"),
+        PUSH((byte) 0b11111100, (byte) 0b11111100, "push"),
+        PUSH_REG((byte) 0b01010000, (byte) 0b11111000, "push")
         ;
         public byte value;
         public byte mask;
